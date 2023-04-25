@@ -17,8 +17,8 @@ namespace ResharperPatcher {
     private static void PrintColor(string message, ConsoleColor color) {
       var pieces = Regex.Split(message, @"(\[[^\]]*\])");
 
-      for (int i = 0; i < pieces.Length; i++) {
-        string piece = pieces[i];
+      for (var i = 0; i < pieces.Length; i++) {
+        var piece = pieces[i];
 
         if (piece.StartsWith("[") && piece.EndsWith("]")) {
           Console.ForegroundColor = color;
@@ -59,15 +59,15 @@ namespace ResharperPatcher {
     #region Cil methods
 
     private static CilBody return_bool(bool status) {
-      CilBody body = new CilBody();
-      OpCode state = status ? OpCodes.Ldc_I4_1 : OpCodes.Ldc_I4_0;
+      var body = new CilBody();
+      var state = status ? OpCodes.Ldc_I4_1 : OpCodes.Ldc_I4_0;
       body.Instructions.Add(state.ToInstruction());
       body.Instructions.Add(OpCodes.Ret.ToInstruction());
       return body;
     }
 
     private static CilBody return_digit(int num) {
-      CilBody body = new CilBody();
+      var body = new CilBody();
       body.Instructions.Add(OpCodes.Ldc_I4.ToInstruction(num));
       body.Instructions.Add(OpCodes.Ret.ToInstruction());
       return body;
@@ -81,20 +81,20 @@ namespace ResharperPatcher {
     }
 
     private static CilBody return_null() {
-      CilBody body = new CilBody();
+      var body = new CilBody();
       body.Instructions.Add(OpCodes.Ldnull.ToInstruction());
       body.Instructions.Add(OpCodes.Ret.ToInstruction());
       return body;
     }
 
     private static CilBody return_empty() {
-      CilBody body = new CilBody();
+      var body = new CilBody();
       body.Instructions.Add(OpCodes.Ret.ToInstruction());
       return body;
     }
 
     private static CilBody return_date(int year, int month, int day) {
-      CilBody body = new CilBody();
+      var body = new CilBody();
 
       var systemDateTime = _main.CorLibTypes.GetTypeRef("System", "DateTime");
 
