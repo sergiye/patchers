@@ -196,6 +196,8 @@ namespace ResharperPatcher {
           }
         }
       }
+
+      yield return Environment.CurrentDirectory; //for portable apps like dotMemory.UI
     }
 
     // ReSharper disable once ArrangeTypeMemberModifiers
@@ -215,16 +217,18 @@ namespace ResharperPatcher {
         var found = false;
         foreach(var installDir in GetInstallDirs()) {
 
-          found = true;
           var file = installDir + "\\JetBrains.Platform.Shell.dll";
-          var fileBackup = installDir + "\\JetBrains.Platform.Shell.dll.back";
+          if (!File.Exists(file))
+            continue;
 
+          found = true;
           PrintColor("[InstallDir]: " + installDir, ConsoleColor.Cyan);
-
+          
+          var fileBackup = installDir + "\\JetBrains.Platform.Shell.dll.back";
           if (!File.Exists(fileBackup)) {
             File.Copy(file, fileBackup);
+            PrintColor("[Backup Path]: " + fileBackup, ConsoleColor.Green);
           }
-          PrintColor("[Backup Path]: " + fileBackup, ConsoleColor.Green);
 
           PrintColor("[Patching]: " + file, ConsoleColor.Red);
           var mainCtx = ModuleDef.CreateModuleContext();
@@ -237,7 +241,7 @@ namespace ResharperPatcher {
         }
 
         if (!found) {
-          PrintColor("ReSharper installation is not found", ConsoleColor.Red);
+          PrintColor("[Error]: ReSharper installation is not found", ConsoleColor.Red);
         }
       }
       catch (Exception ex) {
