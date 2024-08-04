@@ -1,6 +1,8 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Text.RegularExpressions;
 using dnlib.DotNet;
 using dnlib.DotNet.Emit;
@@ -11,38 +13,22 @@ namespace ResharperPatcher {
 
   internal class Program {
 
-    private static ModuleContext _mainCtx;
-    private static ModuleDefMD _main;
-
     private static void PrintColor(string message, ConsoleColor color) {
       var pieces = Regex.Split(message, @"(\[[^\]]*\])");
-
-      for (var i = 0; i < pieces.Length; i++) {
-        var piece = pieces[i];
-
+      foreach (var t in pieces) {
+        var piece = t;
         if (piece.StartsWith("[") && piece.EndsWith("]")) {
           Console.ForegroundColor = color;
           piece = piece.Substring(1, piece.Length - 2);
         }
-
         Console.Write(piece);
         Console.ResetColor();
       }
-
       Console.WriteLine();
     }
 
-    private static void Print(String data) {
-      Console.WriteLine(data);
-    }
-
     private static TypeDef GetType(ModuleDefMD module, string classPath) {
-      foreach (var type in module.Types) {
-        if (type.FullName == classPath)
-          return type;
-      }
-
-      return null;
+      return module.Types.FirstOrDefault(type => type.FullName == classPath);
     }
 
     /*
@@ -93,17 +79,17 @@ namespace ResharperPatcher {
       return body;
     }
 
-    private static CilBody return_date(int year, int month, int day) {
+    private static CilBody return_date(ModuleDefMD main, int year, int month, int day) {
       var body = new CilBody();
 
-      var systemDateTime = _main.CorLibTypes.GetTypeRef("System", "DateTime");
+      var systemDateTime = main.CorLibTypes.GetTypeRef("System", "DateTime");
 
-      var ctor = new MemberRefUser(_main, ".ctor",
+      var ctor = new MemberRefUser(main, ".ctor",
                       MethodSig.CreateInstance(
-                          _main.CorLibTypes.Void,
-                          _main.CorLibTypes.Int32,
-                          _main.CorLibTypes.Int32,
-                          _main.CorLibTypes.Int32),
+                          main.CorLibTypes.Void,
+                          main.CorLibTypes.Int32,
+                          main.CorLibTypes.Int32,
+                          main.CorLibTypes.Int32),
                       systemDateTime);
 
 
@@ -123,25 +109,25 @@ namespace ResharperPatcher {
 
     #endregion
 
-    private static void PatchJetBrainsLicense(string user, string key) {
+    private static void PatchJetBrainsLicense(ModuleDefMD main , string user, string key) {
       PrintColor("---- Please Wait -----", ConsoleColor.Cyan);
       PrintColor("[Customer Key]: " + key, ConsoleColor.DarkCyan);
       PrintColor("[Customer ID]: " + user, ConsoleColor.DarkCyan);
       PrintColor("---- Please Wait -----", ConsoleColor.Cyan);
       // Class LicenseChecker
-      var licenseChecker = GetType(_main, "JetBrains.Application.License.LicenseChecker");
+      var licenseChecker = GetType(main, "JetBrains.Application.License.LicenseChecker");
       // Class LicenseData
-      var licenseData = GetType(_main, "JetBrains.Application.License.LicenseData");
+      var licenseData = GetType(main, "JetBrains.Application.License.LicenseData");
       // Class LicenseData
-      var resultEx = GetType(_main, "JetBrains.Application.License2.ResultEx");
+      var resultEx = GetType(main, "JetBrains.Application.License2.ResultEx");
       // Class UserLicenseViewSubmodel
-      var userLicenseViewSubmodel = GetType(_main, "JetBrains.Application.License2.UserLicenses.UserLicenseViewSubmodel");
+      var userLicenseViewSubmodel = GetType(main, "JetBrains.Application.License2.UserLicenses.UserLicenseViewSubmodel");
       // Class UserLicenseStatus
-      var userLicenseStatus = GetType(_main, "JetBrains.Application.License2.UserLicenses.UserLicenseStatus");
+      var userLicenseStatus = GetType(main, "JetBrains.Application.License2.UserLicenses.UserLicenseStatus");
       // Class ResultWithDescription
-      var resultWithDescription = GetType(_main, "JetBrains.Application.License2.ResultWithDescription");
+      var resultWithDescription = GetType(main, "JetBrains.Application.License2.ResultWithDescription");
       // Class LicensedEntityEx
-      var licensedEntityEx = GetType(_main, "JetBrains.Application.License2.LicensedEntityEx");
+      var licensedEntityEx = GetType(main, "JetBrains.Application.License2.LicensedEntityEx");
       // Class LicensedEntityEx
       //var evaluationLicenseViewSubmodel = GetType(_main, "JetBrains.Application.License2.Evaluation.EvaluationLicenseViewSubmodel");
       //////////////////////////////////////////////////////////////////////
@@ -154,11 +140,11 @@ namespace ResharperPatcher {
       // Patch CustomerId
       licenseChecker.FindMethod("get_CustomerId").Body = return_id(key);
       // Patch get_ExpirationDate
-      licenseData.FindMethod("get_ExpirationDate").Body = return_date(2030, 5, 5);
+      licenseData.FindMethod("get_ExpirationDate").Body = return_date(main, 2030, 5, 5);
       // Patch get_SubscriptionEndDate
-      licenseData.FindMethod("get_SubscriptionEndDate").Body = return_date(2030, 5, 5);
+      licenseData.FindMethod("get_SubscriptionEndDate").Body = return_date(main, 2030, 5, 5);
       // Patch get_GenerationDate
-      licenseData.FindMethod("get_GenerationDate").Body = return_date(2020, 5, 5);
+      licenseData.FindMethod("get_GenerationDate").Body = return_date(main, 2020, 5, 5);
       // Patch get_IsEndless
       licenseData.FindMethod("get_IsEndless").Body = return_bool(true);
       // Patch get_ContainsSubscription
@@ -187,11 +173,15 @@ namespace ResharperPatcher {
       userLicenseStatus.FindMethod("get_Severity").Body = return_digit(0);
     }
 
-    private static string GetInstallDir() {
+    private static IEnumerable<string> GetInstallDirs() {
       
       var vsVersions = new [] {
         "SOFTWARE\\JetBrains\\ReSharperPlatformVs17\\", 
         "SOFTWARE\\JetBrains\\ReSharperPlatformVs16\\",
+        "SOFTWARE\\JetBrains\\dotCover\\",
+        "SOFTWARE\\JetBrains\\dotMemory\\",
+        // "SOFTWARE\\JetBrains\\dotPeek\\", //already free
+        "SOFTWARE\\JetBrains\\dotTrace\\",
       };
 
       foreach (var vsVersion in vsVersions) {
@@ -200,14 +190,12 @@ namespace ResharperPatcher {
         if (reSharperPlatform == null) continue;
         foreach (var sk in reSharperPlatform) {
           using (var key = jbKey.OpenSubKey(sk)) {
-            if (!(key?.GetValue("InstallDir") is string installDir)) continue;
+            if (key?.GetValue("InstallDir") is not string installDir) continue;
             PrintColor("[ReSharper]: " + sk, ConsoleColor.Cyan);
-            return installDir;
+            yield return installDir;
           }
         }
       }
-
-      return null;
     }
 
     // ReSharper disable once ArrangeTypeMemberModifiers
@@ -215,16 +203,19 @@ namespace ResharperPatcher {
     static void Main(string[] args) {
       if (args is null) { }
 
-      Console.SetWindowSize(160, 32);
+      //Console.SetWindowSize(160, 32);
 
       try {
-        string installDir = GetInstallDir();
-        if (installDir == null) {
-          Print("ReSharper is not installed");
-          Console.ReadKey();
-          Environment.Exit(0);
+        var pName = Process.GetProcessesByName("devenv");
+        if (pName.Length > 0) {
+          PrintColor("[Error]: [devenv.exe is running at the background please kill it!]", ConsoleColor.Red);
+          return;
         }
-        else {
+
+        var found = false;
+        foreach(var installDir in GetInstallDirs()) {
+
+          found = true;
           var file = installDir + "\\JetBrains.Platform.Shell.dll";
           var fileBackup = installDir + "\\JetBrains.Platform.Shell.dll.back";
 
@@ -233,35 +224,30 @@ namespace ResharperPatcher {
           if (!File.Exists(fileBackup)) {
             File.Copy(file, fileBackup);
           }
-
           PrintColor("[Backup Path]: " + fileBackup, ConsoleColor.Green);
 
-          var pname = Process.GetProcessesByName("devenv");
-
-          if (pname.Length > 0) {
-            PrintColor("[Error]: [devenv.exe is running at the background please kill it!]", ConsoleColor.Red);
-            Console.ReadKey();
-            Environment.Exit(0);
-          }
-
           PrintColor("[Patching]: " + file, ConsoleColor.Red);
-          _mainCtx = ModuleDef.CreateModuleContext();
+          var mainCtx = ModuleDef.CreateModuleContext();
           // dont feed file directly here feed it with bytes so you can replace the file
-          _main = ModuleDefMD.Load(File.ReadAllBytes(file), _mainCtx);
-          PatchJetBrainsLicense("Sergiye.3xtraTools", "1234-5678-8765-4321");
+          var main = ModuleDefMD.Load(File.ReadAllBytes(file), mainCtx);
+          PatchJetBrainsLicense(main, "Sergiye.3xtraTools", "1234-5678-8765-4321");
           File.SetAttributes(file, FileAttributes.Normal);
-          _main.NativeWrite(file);
-
+          main.NativeWrite(file);
           //File.Copy(file_temp, file+".fuck", true);
-          PrintColor("[Finish]: Press any key to continue...", ConsoleColor.Green);
+        }
+
+        if (!found) {
+          PrintColor("ReSharper installation is not found", ConsoleColor.Red);
         }
       }
       catch (Exception ex) {
         PrintColor("[Error]: " + ex.Message, ConsoleColor.Red);
       }
-
-      Console.ReadKey();
-      Environment.Exit(0);
+      finally {
+        PrintColor("[Finish]: Press any key to continue...", ConsoleColor.Green);
+        Console.ReadKey();
+        Environment.Exit(0);
+      }
     }
   }
 }
