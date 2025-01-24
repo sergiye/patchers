@@ -174,7 +174,7 @@ namespace ResharperPatcher {
     }
 
     private static IEnumerable<string> GetInstallDirs() {
-      
+
       var vsVersions = new [] {
         "SOFTWARE\\JetBrains\\ReSharperPlatformVs17\\", 
         "SOFTWARE\\JetBrains\\ReSharperPlatformVs16\\",
@@ -192,12 +192,17 @@ namespace ResharperPatcher {
           using (var key = jbKey.OpenSubKey(sk)) {
             if (key?.GetValue("InstallDir") is not string installDir) continue;
             PrintColor("[ReSharper]: " + sk, ConsoleColor.Cyan);
-            yield return installDir;
+            yield return installDir.ToLowerInvariant();
           }
         }
       }
 
-      yield return Environment.CurrentDirectory; //for portable apps like dotMemory.UI
+      foreach (var dir in new DirectoryInfo(@"c:\Program Files (x86)\JetBrains\Installations\").EnumerateDirectories()) {
+        if (dir.Name.StartsWith("ReSharperPlatformVs17"))
+          yield return dir.FullName.ToLowerInvariant();
+      }
+
+      yield return Environment.CurrentDirectory.ToLowerInvariant(); //for portable apps like dotMemory.UI
     }
 
     // ReSharper disable once ArrangeTypeMemberModifiers
@@ -215,7 +220,7 @@ namespace ResharperPatcher {
         }
 
         var found = false;
-        foreach(var installDir in GetInstallDirs()) {
+        foreach(var installDir in GetInstallDirs().Distinct()) {
 
           var file = installDir + "\\JetBrains.Platform.Shell.dll";
           if (!File.Exists(file))
